@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Playfair_Display, Inter } from "next/font/google";
@@ -913,7 +915,7 @@ const testimonialsData: Array<[string, string, string, string, string]> = [
     "S",
     "bg-gradient-to-r from-[#e8a598]/30 to-[#8b5cf6]/30",
     "I love that it only uses clothes I already own. No pressure to buy anything. Just smart styling from my existing wardrobe. Absolutely brilliant!",
-    "Surya Kumar",
+    "Arjun K",
     "Bangalore, India",
   ],
   [
@@ -950,7 +952,7 @@ export default function Home() {
   const [ratingImprovements, setRatingImprovements] = useState<string[]>([]);
   const [showResult, setShowResult] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState(0);
+  const [_loadingMessage, setLoadingMessage] = useState(0);
   const [aiStep, setAiStep] = useState(0);
   const [showBanner, setShowBanner] = useState(true);
   const [heroParallaxY, setHeroParallaxY] = useState(0);
@@ -976,8 +978,6 @@ export default function Home() {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [videoNotifyEmail, setVideoNotifyEmail] = useState("");
   const [videoNotifySubscribed, setVideoNotifySubscribed] = useState(false);
-  const [styleDnaEmail, setStyleDnaEmail] = useState("");
-  const [styleDnaSuccess, setStyleDnaSuccess] = useState(false);
   const [uploadSecurityToast, setUploadSecurityToast] = useState(false);
   const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
   const [livePeopleCount, setLivePeopleCount] = useState(9847);
@@ -1539,8 +1539,7 @@ export default function Home() {
             className="text-sm font-medium text-white"
             onClick={() => window.open("https://www.producthunt.com", "_blank")}
           >
-            🚀 We&apos;re launching on Product Hunt! Support us and get 3 months
-            Premium FREE →
+            🚀 CocoStyle is launching soon! Sign up free to be first →
           </p>
           <button
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-white/30 px-2 py-0.5 text-xs text-white"
@@ -1556,14 +1555,14 @@ export default function Home() {
         <div className="relative overflow-hidden bg-gradient-to-r from-[#e8a598] to-[#8b5cf6]">
           <div className="marquee-track flex w-[200%] py-2">
             <p className="w-1/2 whitespace-nowrap text-center text-sm font-medium text-white">
-              🎉 Launch Offer: Get 3 months Premium FREE when you sign up today! ·
-              Offer ends soon · ⏰ Offer expires in: {offerCountdown} · 🎉 Launch Offer: Get 3 months Premium FREE when
-              you sign up today! · Offer ends soon ·
+              🚀 CocoStyle is launching soon! Sign up free to be first → · ⏰
+              Countdown: {offerCountdown} · 🚀 CocoStyle is launching soon! Sign
+              up free to be first → ·
             </p>
             <p className="w-1/2 whitespace-nowrap text-center text-sm font-medium text-white">
-              🎉 Launch Offer: Get 3 months Premium FREE when you sign up today! ·
-              Offer ends soon · ⏰ Offer expires in: {offerCountdown} · 🎉 Launch Offer: Get 3 months Premium FREE when
-              you sign up today! · Offer ends soon ·
+              🚀 CocoStyle is launching soon! Sign up free to be first → · ⏰
+              Countdown: {offerCountdown} · 🚀 CocoStyle is launching soon! Sign
+              up free to be first → ·
             </p>
           </div>
           <button
@@ -1756,7 +1755,7 @@ export default function Home() {
             </div>
 
             <p className="mt-5 text-sm text-white/60">
-              Free forever · No credit card needed · 150 item limit on premium
+              Free forever · No credit card needed · Premium features coming soon
             </p>
 
             <div className="mx-auto mt-4 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-6 py-3">
@@ -2040,9 +2039,12 @@ Examples:
                         </>
                       ) : (
                         <div className="relative">
-                          <img
+                          <Image
                             src={uploadedImage}
                             alt="Outfit preview"
+                            width={400}
+                            height={300}
+                            unoptimized
                             className="h-48 w-full rounded-xl object-cover"
                           />
                           <button
@@ -3063,7 +3065,7 @@ Examples:
                 ["7% Donated to Charity", "✅", "❌", "❌", "❌"],
                 ["Occasion-Based AI", "✅", "❌", "✅", "❌"],
                 ["Weather Integration", "✅", "✅", "❌", "❌"],
-                ["Price", "$0-$5.99", "$3.99-$24.99", "$99.99/yr", "Paid only"],
+                ["Price", "Free Forever", "Coming Soon", "Coming Soon", "Paid only"],
               ].map((row, idx) => (
                 <div
                   key={row[0]}
@@ -3115,7 +3117,7 @@ Examples:
         <section className="bg-black/95 px-4 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-4xl text-center">
             <div>
-              <p className="text-8xl leading-none text-[#e8a598]">"</p>
+              <p className="text-8xl leading-none text-[#e8a598]">&quot;</p>
               <h3 className={`${playfair.className} text-3xl font-bold text-white`}>
                 Why I Built CocoStyle
               </h3>
@@ -3142,7 +3144,7 @@ Examples:
                 <span className="absolute bottom-4 left-4 h-2 w-2 rounded-full bg-rose-400/40 animate-ping [animation-delay:600ms]" />
                 <span className="absolute bottom-4 right-4 h-2 w-2 rounded-full bg-rose-400/40 animate-ping [animation-delay:900ms]" />
 
-                <p className="text-8xl leading-none text-[#e8a598]/30">"</p>
+                <p className="text-8xl leading-none text-[#e8a598]/30">&quot;</p>
                 <p className="mb-4 text-2xl font-bold text-white">
                   Today, CocoStyle helps thousands of people wake up confident —
                 </p>
@@ -3194,7 +3196,7 @@ Examples:
                 </div>
               </div>
               <p className="mt-8 text-center text-xl font-medium italic text-rose-300">
-                — Surya, Founder of CocoStyle 🇮🇳
+                — The CocoStyle Team 🇮🇳
               </p>
             </div>
           </div>
@@ -3214,33 +3216,9 @@ Examples:
             </p>
 
             <div className="mt-8 flex flex-col items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 p-1">
-                <button
-                  onClick={() => setIsYearly(false)}
-                  className={`rounded-full px-4 py-2 text-sm transition-all duration-300 ${
-                    !isYearly
-                      ? "bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] text-white"
-                      : "text-white/60"
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setIsYearly(true)}
-                  className={`rounded-full px-4 py-2 text-sm transition-all duration-300 ${
-                    isYearly
-                      ? "bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] text-white"
-                      : "text-white/60"
-                  }`}
-                >
-                  Yearly
-                </button>
-              </div>
-              {isYearly && (
-                <span className="rounded-full bg-green-500 px-3 py-1 text-xs font-semibold text-white">
-                  Save 30% 🎉
-                </span>
-              )}
+              <span className="rounded-full bg-green-500 px-3 py-1 text-xs font-semibold text-white">
+                Best Value
+              </span>
             </div>
 
             <div className="mx-auto mt-6 flex max-w-2xl items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
@@ -3263,10 +3241,7 @@ Examples:
                   Free Forever
                 </span>
                 <p className="mt-4 text-5xl font-bold text-white transition-all duration-300">
-                  $0
-                  <span className="text-base font-medium text-white/70">
-                    /{isYearly ? "year" : "month"}
-                  </span>
+                  Free Forever
                 </p>
                 <ul className="mt-6 space-y-3 text-sm text-white/90">
                   <li>✓ 50 clothing items</li>
@@ -3282,27 +3257,19 @@ Examples:
 
               <article className="reveal flex h-full scale-100 flex-col rounded-2xl border-2 border-rose-400/50 bg-white/5 p-8 transition-all duration-300 hover:-translate-y-1 lg:scale-105">
                 <span className="mb-3 inline-block w-fit rounded-full bg-green-500 px-3 py-1 text-xs font-semibold text-white">
-                  FREE 7-DAY TRIAL
+                  Premium Plan
                 </span>
                 <span className="inline-block w-fit rounded-full bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-3 py-1 text-xs font-semibold text-white">
-                  Most Popular ⭐
+                  Coming Soon
                 </span>
-                {isYearly && (
-                  <p className="mt-2 text-sm text-white/60 line-through">$71.88 value</p>
-                )}
                 <div className="mt-4 flex items-end gap-2">
-                  <p className="text-5xl font-bold text-white transition-all duration-300">
-                    {isYearly ? "$49.99" : "$5.99"}
-                  </p>
-                  <p className="mb-1 text-sm text-white/80">
-                    per {isYearly ? "year" : "month"}
+                  <p className="bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] bg-clip-text text-3xl font-bold text-transparent">
+                    Join Waitlist
                   </p>
                 </div>
-                {isYearly && (
-                  <p className="mt-2 w-fit rounded-full bg-green-500 px-3 py-1 text-xs font-semibold text-white">
-                    You save $21.89! 🎉
-                  </p>
-                )}
+                <p className="mt-2 text-sm text-white/60">
+                  Be first to know when Premium launches
+                </p>
                 <ul className="mt-6 space-y-3 text-sm text-white/90">
                   <li>✓ 150 clothing items</li>
                   <li>✓ Unlimited outfit suggestions</li>
@@ -3314,10 +3281,10 @@ Examples:
                   <li>✓ Priority support</li>
                 </ul>
                 <button className="mt-auto w-full rounded-full bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:scale-105">
-                  Start Premium
+                  Join Waitlist
                 </button>
                 <p className="mt-3 text-center text-sm font-medium text-rose-300">
-                  🔥 7-day free trial included · Cancel anytime · No questions asked
+                  🔥 Premium plan is coming soon
                 </p>
                 <p className="mt-4 text-center text-xs text-white/60">
                   Cancel anytime · No hidden fees
@@ -3350,11 +3317,11 @@ Examples:
                   <span className="text-4xl">🎁</span>
                   <div>
                     <p className="text-xl font-bold text-white">
-                      Refer a Friend · Get 1 Month FREE
+                      Refer a Friend · Exclusive early access
                     </p>
                     <p className="text-sm text-white/70">
                       Share CocoStyle with a friend. When they sign up, you both
-                      get 1 month Premium free.
+                      get exclusive early access.
                     </p>
                   </div>
                 </div>

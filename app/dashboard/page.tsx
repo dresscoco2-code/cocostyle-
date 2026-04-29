@@ -10,9 +10,11 @@ export default function DashboardPage() {
         <h1 className="mt-4 text-3xl font-bold text-white">Welcome to CocoStyle! 🎉</h1>
         <p className="mt-3 text-white/70">Your confidence journey starts here.</p>
         <div className="mt-8">
-          <button className="rounded-xl bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-5 py-3 font-semibold text-white">
-            Complete your profile
-          </button>
+          <button 
+  onClick={() => window.location.href = '/onboarding'}
+  className="rounded-xl bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-5 py-3 font-semibold text-white transition-all duration-300 hover:scale-[1.01]">
+  Complete your profile
+</button>
         </div>
       </section>
     </main>

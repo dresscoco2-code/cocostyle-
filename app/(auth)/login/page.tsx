@@ -4,10 +4,11 @@ import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
 export default function LoginPage() {
-  const [step, setStep] = useState(1) // 1=email, 2=otp, 3=password
+  const [step, setStep] = useState(1) // 1=email, 2=otp, 3=set password
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -18,7 +19,7 @@ export default function LoginPage() {
     setError('')
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: false }
+      options: { shouldCreateUser: true }
     })
     if (error) setError(error.message)
     else setStep(2)
@@ -36,19 +37,25 @@ export default function LoginPage() {
       type: 'email'
     })
     if (error) setError('Invalid OTP. Please try again.')
-    else {
-      await supabase.auth.signOut() // sign out so they complete with password
-      setStep(3)
-    }
+    else window.location.href = '/dashboard'
     setLoading(false)
   }
 
-  // Step 3: Login with password
-  const handleLogin = async () => {
-    if (!password) return setError('Please enter your password')
+  // Step 3: Set Password
+  const handleSetPassword = async () => {
+    if (!password) return setError('Please enter a password')
+    if (password.length < 6) return setError('Password must be at least 6 characters')
+    if (password !== confirmPassword) return setError('Passwords do not match!')
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setError('Session expired. Please start again.')
+      setStep(1)
+      setLoading(false)
+      return
+    }
+    const { error } = await supabase.auth.updateUser({ password })
     if (error) setError(error.message)
     else window.location.href = '/dashboard'
     setLoading(false)
@@ -85,17 +92,17 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-2">
-            {step === 1 && 'Welcome Back 👋'}
+            {step === 1 && 'Welcome 👋'}
             {step === 2 && 'Check Your Email 📧'}
-            {step === 3 && 'Enter Password 🔐'}
+            {step === 3 && 'Set Your Password 🔐'}
           </h2>
           <p className="text-white/60 text-sm mb-6">
-            {step === 1 && 'Login to continue your style journey.'}
-            {step === 2 && `We sent a 6-digit code to ${email}`}
-            {step === 3 && 'Almost there! Enter your password.'}
+            {step === 1 && 'Sign in or create your account.'}
+            {step === 2 && `We sent an 8-digit code to ${email}`}
+            {step === 3 && 'Create a password to secure your account.'}
           </p>
 
-          {/* Google Button - only on step 1 */}
+          {/* Step 1: Email */}
           {step === 1 && (
             <>
               <button onClick={handleGoogle}
@@ -113,12 +120,6 @@ export default function LoginPage() {
                 <span className="text-white/40 text-xs">or continue with email</span>
                 <div className="flex-1 h-px bg-white/10" />
               </div>
-            </>
-          )}
-
-          {/* Step 1: Email */}
-          {step === 1 && (
-            <>
               <input type="email" placeholder="Email address" value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendOTP()}
@@ -135,8 +136,8 @@ export default function LoginPage() {
           {/* Step 2: OTP */}
           {step === 2 && (
             <>
-              <input type="text" placeholder="Enter 6-digit OTP" value={otp}
-                onChange={(e) => setOtp(e.target.value)} maxLength={6}
+              <input type="text" placeholder="Enter 8-digit OTP" value={otp}
+                onChange={(e) => setOtp(e.target.value)} maxLength={8}
                 onKeyDown={(e) => e.key === 'Enter' && handleVerifyOTP()}
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-rose-400 mb-2 text-sm text-center tracking-widest text-lg" />
               <p className="text-white/40 text-xs text-center mb-4">
@@ -155,21 +156,21 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* Step 3: Password */}
+          {/* Step 3: Set Password */}
           {step === 3 && (
             <>
-              <input type="password" placeholder="Enter your password" value={password}
+              <input type="password" placeholder="Create password" value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-rose-400 mb-2 text-sm" />
-              <div className="text-right mb-4">
-                <Link href="/forgot-password" className="text-rose-300 text-xs hover:text-rose-200">Forgot password?</Link>
-              </div>
+                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-rose-400 mb-3 text-sm" />
+              <input type="password" placeholder="Confirm password" value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSetPassword()}
+                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-rose-400 mb-4 text-sm" />
               {error && <p className="text-red-300 text-sm mb-3">⚠️ {error}</p>}
-              <button onClick={handleLogin} disabled={loading}
+              <button onClick={handleSetPassword} disabled={loading}
                 className="w-full py-3 rounded-xl text-white font-medium hover:scale-105 transition-all duration-300 disabled:opacity-50"
                 style={{background:'linear-gradient(135deg,#e8a598,#8b5cf6)'}}>
-                {loading ? 'Logging in...' : 'Login →'}
+                {loading ? 'Setting up...' : 'Go to Dashboard →'}
               </button>
             </>
           )}

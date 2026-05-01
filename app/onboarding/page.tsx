@@ -26,7 +26,6 @@ export default function OnboardingPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [step, setStep] = useState(1);
-  const [userId, setUserId] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +44,6 @@ export default function OnboardingPage() {
         router.replace("/login");
         return;
       }
-      setUserId(user.id);
       setLoadingUser(false);
     };
 
@@ -81,20 +79,32 @@ export default function OnboardingPage() {
   };
 
   const finishOnboarding = async () => {
-    if (!userId || !bodyType || !stylePersonality) {
+    if (!bodyType || !stylePersonality) {
       setError("Please complete all required selections.");
       return;
     }
     setSaving(true);
     setError("");
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setError("Please log in again to continue.");
+      setSaving(false);
+      router.replace("/login");
+      return;
+    }
+
     const { error: upsertError } = await supabase.from("profiles").upsert(
       {
-        user_id: userId,
+        id: user.id,
         skin_tone: skinTone,
         body_type: bodyType,
         style_personality: stylePersonality,
       },
-      { onConflict: "user_id" }
+      { onConflict: "id" }
     );
 
     if (upsertError) {

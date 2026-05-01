@@ -1630,13 +1630,16 @@ export default function Home() {
             <span title="Bank-level security" className="text-xs text-white/40">
               🔒
             </span>
-            <button className="rounded-full border border-white px-5 py-2 text-sm font-medium text-white transition-all duration-300 hover:scale-105">
+            <button
+              onClick={() => (window.location.href = "/auth/login")}
+              className="rounded-full border border-white px-5 py-2 text-sm font-medium text-white transition-all duration-300 hover:scale-105"
+            >
               Login
             </button>
             <div className="relative">
               <span className="pointer-events-none absolute inset-0 rounded-full bg-rose-400/20 animate-ping" />
               <button
-                onClick={triggerConfetti}
+                onClick={() => (window.location.href = "/auth/login")}
                 className="relative rounded-full bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-rose-500/60"
               >
                 Get Started
@@ -1674,11 +1677,14 @@ export default function Home() {
                 </a>
               ))}
               <div className="flex gap-3 pt-1">
-                <button className="rounded-full border border-white px-4 py-2 text-sm font-medium text-white transition-all duration-300 hover:scale-105">
+                <button
+                  onClick={() => (window.location.href = "/auth/login")}
+                  className="rounded-full border border-white px-4 py-2 text-sm font-medium text-white transition-all duration-300 hover:scale-105"
+                >
                   Login
                 </button>
                 <button
-                  onClick={triggerConfetti}
+                  onClick={() => (window.location.href = "/auth/login")}
                   className="rounded-full bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:scale-105"
                 >
                   Get Started
@@ -1746,7 +1752,10 @@ export default function Home() {
             </p>
 
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <button className="rounded-full bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-rose-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-rose-500/60">
+              <button
+                onClick={() => (window.location.href = "/auth/login")}
+                className="rounded-full bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-rose-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-rose-500/60"
+              >
                 {language === "HI" ? "मुफ्त शुरू करें →" : "Start Styling Free →"}
               </button>
               <button className="rounded-full border border-white bg-transparent px-8 py-4 text-sm font-semibold text-white transition-all duration-300 hover:scale-105">

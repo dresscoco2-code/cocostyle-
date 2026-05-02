@@ -40,11 +40,12 @@ export default function InsightsPage() {
       const endpoint = type === "combos" ? "/api/insights/combos" : "/api/insights";
       const response = await fetch(endpoint, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ type }),
+        body: JSON.stringify({ type, accessToken: token }),
       });
       const data = await response.json();
       setResult(data.result);

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+'use client';
 
 const CATEGORIES = [
   { slug: 'uppers' as const, label: 'Uppers', emoji: '👕', blurb: 'Tops, shirts, knits' },
@@ -22,15 +22,15 @@ export default function WardrobePage() {
         <ul className="mt-10 grid gap-4 sm:grid-cols-2">
           {CATEGORIES.map(({ slug, label, emoji, blurb }) => (
             <li key={slug}>
-              <Link
+              <a
                 href={`/wardrobe/${slug}`}
-                className="flex flex-col gap-2 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-6 transition hover:border-[#c084fc]/40 hover:bg-white/[0.06]"
+                className="flex flex-col gap-2 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-6 text-inherit no-underline transition hover:border-[#c084fc]/40 hover:bg-white/[0.06]"
               >
                 <span className="text-3xl">{emoji}</span>
                 <span className="text-lg font-semibold text-white">{label}</span>
                 <span className="text-sm text-white/45">{blurb}</span>
                 <span className="mt-2 text-sm font-medium text-[#c084fc]">Open →</span>
-              </Link>
+              </a>
             </li>
           ))}
         </ul>

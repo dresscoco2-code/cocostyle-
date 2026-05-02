@@ -1,256 +1,287 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useCallback, useEffect, useState } from 'react';
+import { useWardrobe } from '@/app/components/useWardrobe';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
-type WardrobeItem = {
-  id: string;
-  category: string;
-  name: string;
-  color: string;
-  style: string;
-  occasion?: string;
-  tip?: string;
-  image_url?: string;
+const OCCASIONS = [
+  { label: 'Work', emoji: '💼' },
+  { label: 'Date Night', emoji: '✨' },
+  { label: 'Wedding', emoji: '💒' },
+  { label: 'Party', emoji: '🎉' },
+  { label: 'Gym', emoji: '🏋️' },
+  { label: 'Beach', emoji: '🏖️' },
+  { label: 'Travel', emoji: '✈️' },
+  { label: 'Formal', emoji: '🎩' },
+  { label: 'Brunch', emoji: '🥂' },
+  { label: 'Casual', emoji: '👟' },
+  { label: 'Interview', emoji: '📋' },
+  { label: 'Graduation', emoji: '🎓' },
+  { label: 'Concert', emoji: '🎤' },
+  { label: 'Festival', emoji: '🎪' },
+  { label: 'Airport', emoji: '🛫' },
+  { label: 'Dinner with friends', emoji: '🍽️' },
+  { label: 'Coffee date', emoji: '☕' },
+  { label: 'Holiday party', emoji: '🎄' },
+  { label: "New Year's Eve", emoji: '🎆' },
+  { label: 'Picnic', emoji: '🧺' },
+  { label: 'Hiking', emoji: '🥾' },
+  { label: 'Yoga class', emoji: '🧘' },
+  { label: 'Shopping day', emoji: '🛍️' },
+  { label: 'Client meeting', emoji: '🤝' },
+  { label: 'Presentation', emoji: '📊' },
+  { label: 'Family gathering', emoji: '👨‍👩‍👧' },
+  { label: 'Romantic dinner', emoji: '🕯️' },
+  { label: 'Club night', emoji: '🪩' },
+  { label: 'Sports event', emoji: '🏟️' },
+  { label: 'Weekend getaway', emoji: '🧳' },
+] as const;
+
+type OutfitPick = {
+  headline: string;
+  why: string;
+  confidenceScore: number;
+  selectedItems: Array<{
+    id: string;
+    name: string;
+    category?: string | null;
+    image_url?: string | null;
+  }>;
 };
-
-type OutfitSuggestion = {
-  occasion: string;
-  title: string;
-  items: string[];
-  whyConfidence: string;
-};
-
-const occasions = [
-  { label: "☀️ Daily Casual", value: "Daily Casual" },
-  { label: "💼 Work / Office", value: "Work / Office" },
-  { label: "🎉 Party Night", value: "Party Night" },
-  { label: "🏋️ Gym / Sports", value: "Gym / Sports" },
-  { label: "💑 Date Night", value: "Date Night" },
-  { label: "✈️ Travel", value: "Travel" },
-  { label: "🎓 College / Campus", value: "College / Campus" },
-  { label: "🛍️ Shopping Day", value: "Shopping Day" },
-  { label: "☕ Coffee Meetup", value: "Coffee Meetup" },
-  { label: "🎨 Creative Day", value: "Creative Day" },
-  { label: "🏖️ Beach Day", value: "Beach Day" },
-  { label: "🌧️ Rainy Day", value: "Rainy Day" },
-  { label: "❄️ Winter Outing", value: "Winter Outing" },
-  { label: "🌸 Spring Walk", value: "Spring Walk" },
-  { label: "🍂 Autumn Stroll", value: "Autumn Stroll" },
-  { label: "🎤 Concert / Show", value: "Concert / Show" },
-  { label: "🎭 Theatre / Opera", value: "Theatre / Opera" },
-  { label: "🍽️ Fine Dining", value: "Fine Dining" },
-  { label: "🍕 Casual Dinner", value: "Casual Dinner" },
-  { label: "🏠 House Party", value: "House Party" },
-  { label: "💍 Wedding Guest", value: "Wedding Guest" },
-  { label: "🤵 Formal Event", value: "Formal Event" },
-  { label: "🙏 Religious / Temple", value: "Religious / Temple" },
-  { label: "🎂 Birthday Party", value: "Birthday Party" },
-  { label: "👨‍👩‍👧 Family Gathering", value: "Family Gathering" },
-  { label: "🏕️ Camping / Hiking", value: "Camping / Hiking" },
-  { label: "🐴 Brunch with Friends", value: "Brunch with Friends" },
-  { label: "🎮 Gaming Night", value: "Gaming Night" },
-  { label: "📸 Photoshoot", value: "Photoshoot" },
-  { label: "🌙 Night Out", value: "Night Out" },
-];
 
 export default function ConfidencePage() {
-  const [outfits, setOutfits] = useState<OutfitSuggestion[]>([]);
-  const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [selectedOccasion, setSelectedOccasion] = useState<string>("Daily Casual");
+  const { items, loading: wLoading, userId, noConfig, error: wErr, refresh } = useWardrobe();
+  const [skinTone, setSkinTone] = useState<string | null>(null);
+  const [undertone, setUndertone] = useState<string | null>(null);
+  const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
+  const [pick, setPick] = useState<OutfitPick | null>(null);
+  const [pickLoading, setPickLoading] = useState(false);
+  const [pickErr, setPickErr] = useState<string | null>(null);
 
-  const generateOutfitsForOccasion = async (items: WardrobeItem[], occasion: string) => {
-    setLoading(true);
-    setError("");
+  const loadProfileSkin = useCallback(async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !userId) {
+      setSkinTone(null);
+      setUndertone(null);
+      return;
+    }
+    const { data } = await supabase
+      .from('profiles')
+      .select('skin_tone,undertone')
+      .eq('id', userId)
+      .maybeSingle();
+    setSkinTone(data?.skin_tone ?? null);
+    setUndertone(data?.undertone ?? null);
+  }, [userId]);
+
+  useEffect(() => {
+    void loadProfileSkin();
+  }, [loadProfileSkin]);
+
+  const runOccasion = async (occasion: string) => {
+    if (!items.length) {
+      setPickErr('Add pieces to your wardrobe first.');
+      return;
+    }
+    setActiveOccasion(occasion);
+    setPickLoading(true);
+    setPickErr(null);
+    setPick(null);
     try {
-      const response = await fetch("/api/confidence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items, occasion }),
+      const res = await fetch('/api/confidence', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          occasion,
+          profileSkinTone: skinTone,
+          profileUndertone: undertone,
+          wardrobeItems: items.map((i) => ({
+            id: i.id,
+            name: i.name,
+            category: i.category,
+            image_url: i.image_url,
+            color: i.color ?? null,
+          })),
+        }),
       });
-
-      const data = (await response.json()) as {
-        outfits?: OutfitSuggestion[];
-        error?: string;
-        details?: string;
-      };
-
-      if (!response.ok) {
-        setError(data.error || data.details || "Failed to generate outfit suggestions.");
-        return;
-      }
-
-      if (!data.outfits || data.outfits.length < 1) {
-        setError("Claude did not return outfit combinations.");
-        return;
-      }
-
-      setOutfits(data.outfits.slice(0, 3));
+      const j = (await res.json()) as OutfitPick & { error?: string };
+      if (!res.ok) throw new Error(j.error ?? 'Could not build outfit');
+      setPick({
+        headline: j.headline,
+        why: j.why,
+        confidenceScore: j.confidenceScore,
+        selectedItems: j.selectedItems ?? [],
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unexpected error occurred.");
+      setPickErr(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
-      setLoading(false);
+      setPickLoading(false);
     }
   };
 
-  useEffect(() => {
-    const run = async () => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError) {
-          setError(userError.message);
-          return;
-        }
-        if (!user) {
-          setError("Please log in to generate confident outfit suggestions.");
-          return;
-        }
-
-        const { data: wardrobeData, error: wardrobeError } = await supabase
-          .from("wardrobe")
-          .select("id, category, name, color, style, occasion, tip, image_url")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-
-        if (wardrobeError) {
-          setError(`Wardrobe fetch failed: ${wardrobeError.message}`);
-          return;
-        }
-
-        const items = (wardrobeData ?? []) as WardrobeItem[];
-        if (items.length === 0) {
-          setError("Add clothes to your wardrobe first.");
-          return;
-        }
-        setWardrobeItems(items);
-
-        await generateOutfitsForOccasion(items, selectedOccasion);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Unexpected error occurred.");
-      } finally {
-        // loading handled by generateOutfitsForOccasion
-      }
-    };
-
-    void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const findWardrobeMatch = (suggestedItemName: string) => {
-    const query = suggestedItemName.trim().toLowerCase();
-    if (!query) return null;
-
-    const exact = wardrobeItems.find((item) => item.name.trim().toLowerCase() === query);
-    if (exact) return exact;
-
-    const partial = wardrobeItems.find((item) => {
-      const candidate = item.name.trim().toLowerCase();
-      return candidate.includes(query) || query.includes(candidate);
-    });
-    return partial ?? null;
-  };
-
   return (
-    <main className="min-h-screen bg-black px-4 py-10 sm:px-6">
-      <div className="mx-auto max-w-6xl">
-        <h1 className="bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] bg-clip-text text-4xl font-bold italic text-transparent">
-          Confidence Fits
+    <div className="min-h-screen bg-[#07070c] pb-20 text-zinc-100">
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/40">CocoStyle</p>
+        <h1 className="mt-2 bg-gradient-to-r from-[#e8a598] via-[#c084fc] to-[#8b5cf6] bg-clip-text text-3xl font-semibold tracking-tight text-transparent md:text-4xl">
+          Confidence looks
         </h1>
-        <p className="mt-2 text-white/60">
-          Personalized outfit combinations for daily casual, work/formal, and party occasions.
+        <p className="mt-3 max-w-2xl text-sm text-white/50">
+          Pick an occasion — we&apos;ll build an outfit from your wardrobe and score how well it
+          suits you (including your skin tone from your profile when set).
         </p>
 
-        <div className="mt-6">
-          <p className="mb-3 text-sm font-medium text-white/70">Choose your occasion</p>
-          <div className="max-h-72 overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-3">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {occasions.map((occasion) => {
-              const active = selectedOccasion === occasion.value;
-              return (
-                <button
-                  key={occasion.value}
-                  type="button"
-                  onClick={() => {
-                    setSelectedOccasion(occasion.value);
-                    if (wardrobeItems.length > 0) {
-                      void generateOutfitsForOccasion(wardrobeItems, occasion.value);
-                    }
+        {noConfig ? (
+          <p className="mt-6 text-sm text-amber-200/90">
+            Configure Supabase env vars to load your wardrobe.
+          </p>
+        ) : null}
+        {wErr ? <p className="mt-4 text-sm text-rose-300">{wErr}</p> : null}
+
+        {!userId && !wLoading ? (
+          <p className="mt-8 text-sm text-white/45">Sign in to use Confidence with your wardrobe.</p>
+        ) : null}
+
+        {(skinTone || undertone) && userId ? (
+          <p className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/70">
+            Profile coloring:{' '}
+            <span className="font-medium text-white">{skinTone ?? '—'}</span>
+            {undertone ? (
+              <>
+                {' '}
+                · undertone <span className="text-[#c084fc]">{undertone}</span>
+              </>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void loadProfileSkin()}
+              className="ml-3 text-xs text-[#e8a598] underline-offset-2 hover:underline"
+            >
+              Refresh
+            </button>
+          </p>
+        ) : userId ? (
+          <p className="mt-6 text-sm text-white/40">
+            Add your skin tone on the{' '}
+            <a href="/profile" className="text-[#c084fc] hover:underline">
+              Profile
+            </a>{' '}
+            page for more tailored color picks.
+          </p>
+        ) : null}
+
+        <section className="mt-10">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-white/90">Occasions</h2>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="text-xs text-white/45 hover:text-white"
+            >
+              Refresh wardrobe
+            </button>
+          </div>
+          {wLoading ? (
+            <p className="text-sm text-white/40">Loading wardrobe…</p>
+          ) : (
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {OCCASIONS.map(({ label, emoji }) => {
+                const active = activeOccasion === label;
+                return (
+                  <li key={label}>
+                    <button
+                      type="button"
+                      disabled={pickLoading || !userId || !items.length}
+                      onClick={() => void runOccasion(label)}
+                      className={`flex w-full flex-col items-start gap-1 rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                        active
+                          ? 'border-[#c084fc]/60 bg-gradient-to-br from-[#e8a598]/20 to-[#8b5cf6]/20 text-white'
+                          : 'border-white/[0.08] bg-white/[0.02] text-white/85 hover:border-white/20 hover:bg-white/[0.04]'
+                      } disabled:cursor-not-allowed disabled:opacity-40`}
+                    >
+                      <span className="text-lg">{emoji}</span>
+                      <span className="font-medium leading-snug">{label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {pickErr ? (
+          <p className="mt-6 text-sm text-rose-300" role="alert">
+            {pickErr}
+          </p>
+        ) : null}
+
+        {pickLoading ? (
+          <p className="mt-8 text-sm text-white/50">
+            Styling{activeOccasion ? ` for ${activeOccasion}` : ''}…
+          </p>
+        ) : null}
+
+        {pick && !pickLoading ? (
+          <section className="mt-10 space-y-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-white/40">Your outfit</p>
+                <h3 className="mt-1 text-xl font-semibold text-white">{pick.headline}</h3>
+                <p className="mt-2 max-w-xl text-sm text-white/60">{pick.why}</p>
+              </div>
+              <div className="flex shrink-0 flex-col items-center rounded-2xl border border-white/10 bg-[#0d0d18] px-6 py-4">
+                <span className="text-xs text-white/45">Confidence</span>
+                <span
+                  className="mt-1 text-4xl font-bold tabular-nums"
+                  style={{
+                    background: 'linear-gradient(135deg, #e8a598, #8b5cf6)',
+                    WebkitBackgroundClip: 'text',
+                    color: 'transparent',
                   }}
-                  className={`rounded-xl border px-4 py-3 text-left text-sm transition-all ${
-                    active
-                      ? "border-rose-300/60 bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] text-white"
-                      : "border-white/10 bg-white/5 text-white/75 hover:border-white/20 hover:bg-white/10"
-                  }`}
                 >
-                  {occasion.label}
-                </button>
-              );
-            })}
+                  {pick.confidenceScore}
+                </span>
+                <span className="text-xs text-white/35">out of 100</span>
+              </div>
             </div>
-          </div>
-        </div>
-
-        {loading && (
-          <div className="mt-8 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-6 text-white/80">
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            Generating confidence outfits for {selectedOccasion}...
-          </div>
-        )}
-
-        {!loading && error && (
-          <div className="mt-8 rounded-2xl border border-red-400/30 bg-red-500/10 p-6 text-red-300">
-            {error}
-          </div>
-        )}
-
-        {!loading && !error && (
-          <div className="mt-8 grid gap-5 md:grid-cols-3">
-            {outfits.map((outfit, idx) => (
-              <article
-                key={`${outfit.occasion}-${idx}`}
-                className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md"
-              >
-                <p className="text-xs uppercase tracking-widest text-white/50">{outfit.occasion}</p>
-                <h2 className="mt-2 text-xl font-bold text-white">{outfit.title}</h2>
-                <ul className="mt-4 space-y-2 text-sm text-white/75">
-                  {outfit.items.map((itemName) => {
-                    const matched = findWardrobeMatch(itemName);
-                    return (
-                      <li
-                        key={`${outfit.occasion}-${itemName}`}
-                        className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2"
-                      >
-                        {matched?.image_url ? (
-                          <img
-                            src={matched.image_url}
-                            alt={matched.name}
-                            className="h-20 w-20 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="h-20 w-20 rounded-lg border border-white/10 bg-white/5" />
-                        )}
-                        <span>{itemName}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <p className="mt-4 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/80">
-                  {outfit.whyConfidence}
-                </p>
-              </article>
-            ))}
-          </div>
-        )}
+            <div>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wider text-white/40">
+                Pieces
+              </p>
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {pick.selectedItems.map((row) => (
+                  <li
+                    key={row.id}
+                    className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#12121a]"
+                  >
+                    <div className="aspect-square w-full bg-[#1a1a24]">
+                      {row.image_url ? (
+                        <img
+                          src={row.image_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-white/25">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="truncate text-xs font-medium text-white">{row.name}</p>
+                      {row.category ? (
+                        <p className="truncate text-[10px] uppercase tracking-wide text-white/40">
+                          {row.category}
+                        </p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        ) : null}
       </div>
-    </main>
+    </div>
   );
 }

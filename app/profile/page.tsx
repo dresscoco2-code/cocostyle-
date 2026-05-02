@@ -1,484 +1,253 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import {
+  resolveSkinTonePaletteKey,
+  skinToneColors,
+} from '@/lib/skin-tone-colors';
+import type { SkinToneResult } from '@/lib/agents/types';
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("Failed to read image."));
-        return;
-      }
-      const base64 = result.split(",")[1];
-      if (!base64) {
-        reject(new Error("Invalid image data."));
-        return;
-      }
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error("Could not read file."));
-    reader.readAsDataURL(file);
-  });
+async function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]!);
+  return {
+    base64: btoa(binary),
+    mimeType: file.type?.startsWith('image/') ? file.type : 'image/jpeg',
+  };
+}
+
+function undertoneSwatchStyle(undertone: string | null | undefined): string {
+  const u = undertone?.toLowerCase() ?? '';
+  if (u.includes('warm')) {
+    return 'linear-gradient(135deg, #fdba74, #ea580c, #9a3412)';
+  }
+  if (u.includes('cool')) {
+    return 'linear-gradient(135deg, #93c5fd, #6366f1, #312e81)';
+  }
+  return 'linear-gradient(135deg, #d4d4d8, #a78bfa, #52525b)';
 }
 
 export default function ProfilePage() {
-  const selfieInputRef = useRef<HTMLInputElement | null>(null);
-  const fullBodyInputRef = useRef<HTMLInputElement | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [firstName, setFirstName] = useState<string | null>(null);
+  const [skinTone, setSkinTone] = useState<string | null>(null);
+  const [undertone, setUndertone] = useState<string | null>(null);
+  const [bestColors, setBestColors] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [noConfig, setNoConfig] = useState(false);
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
-  const [fullBodyPreview, setFullBodyPreview] = useState<string | null>(null);
-  const [skinTone, setSkinTone] = useState<string>("");
-  const [ageGroup, setAgeGroup] = useState("");
-  const [gender, setGender] = useState("");
-  const [stylePersonality, setStylePersonality] = useState("");
-  const [bodyType, setBodyType] = useState("");
-  const [loadingSelfie, setLoadingSelfie] = useState(false);
-  const [loadingFullBody, setLoadingFullBody] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [savingDetails, setSavingDetails] = useState(false);
-  const [message, setMessage] = useState("");
-  const [selfieError, setSelfieError] = useState("");
-  const [fullBodyError, setFullBodyError] = useState("");
-  const [selfieSavedMessage, setSelfieSavedMessage] = useState("");
-  const [fullBodySavedMessage, setFullBodySavedMessage] = useState("");
-
-  useEffect(() => {
-    const loadExistingProfile = async () => {
-      setLoadingProfile(true);
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          setSelfieError("Please log in again.");
-          setLoadingProfile(false);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (error) {
-          // If profile row does not exist yet, keep defaults without showing an error.
-          if (error.code === "PGRST116") {
-            setLoadingProfile(false);
-            return;
-          }
-          setSelfieError(error.message);
-          setLoadingProfile(false);
-          return;
-        }
-
-        if (data) {
-          if (data.selfie_url) {
-            const savedSelfie = data.selfie_url as string;
-            setSelfiePreview(savedSelfie);
-          }
-          if (data.full_body_url) {
-            const savedFullBody = data.full_body_url as string;
-            setFullBodyPreview(savedFullBody);
-          }
-          if (data.skin_tone) {
-            const savedSkinTone = data.skin_tone as string;
-            setSkinTone(savedSkinTone);
-          }
-          if (data.age_group) setAgeGroup(data.age_group as string);
-          if (data.gender) setGender(data.gender as string);
-          if (data.style_personality) setStylePersonality(data.style_personality as string);
-          if (data.body_type) setBodyType(data.body_type as string);
-        }
-      } finally {
-        setLoadingProfile(false);
-      }
-    };
-
-    void loadExistingProfile();
+  const loadProfile = useCallback(async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setNoConfig(true);
+      setLoading(false);
+      return;
+    }
+    setNoConfig(false);
+    setLoading(true);
+    setError(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const u = sessionData.session?.user ?? null;
+    setUser(u);
+    if (!u) {
+      setFirstName(null);
+      setSkinTone(null);
+      setUndertone(null);
+      setBestColors([]);
+      setLoading(false);
+      return;
+    }
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('first_name,skin_tone,undertone')
+      .eq('id', u.id)
+      .maybeSingle();
+    setFirstName(prof?.first_name ?? null);
+    setSkinTone(prof?.skin_tone ?? null);
+    setUndertone(prof?.undertone ?? null);
+    setBestColors([]);
+    setLoading(false);
   }, []);
 
-  const handleSelfieUpload = async (file: File) => {
-    setLoadingSelfie(true);
-    setSelfieError("");
-    setSelfieSavedMessage("");
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
 
+  const paletteKey = resolveSkinTonePaletteKey(skinTone, undertone);
+  const paletteRule = skinToneColors[paletteKey];
+
+  const displayName =
+    firstName?.trim() ||
+    (typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : null) ||
+    (user?.email ? user.email.split('@')[0] : null) ||
+    '—';
+
+  const handleSelfie = async (file: File) => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !user) return;
+    setAnalyzeLoading(true);
+    setError(null);
+    setSuccess(null);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setSelfieError("Please log in again.");
-        setLoadingSelfie(false);
-        return;
-      }
-
-      // 1) Convert to base64
-      const imageBase64 = await fileToBase64(file);
-
-      // 6) Show preview
-      const preview = URL.createObjectURL(file);
-      setSelfiePreview(preview);
-
-      // 2) Upload to storage at fixed path
-      const selfiePath = `selfies/${user.id}/selfie.jpg`;
-      const { error: uploadError } = await supabase.storage.from("profiles").upload(selfiePath, file, {
-        upsert: true,
-        contentType: file.type || "image/jpeg",
+      const { base64, mimeType } = await fileToBase64(file);
+      const res = await fetch('/api/agents/skin-tone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mimeType }),
       });
-      if (uploadError) {
-        setSelfieError(uploadError.message);
-        setLoadingSelfie(false);
-        return;
-      }
+      const data = (await res.json()) as SkinToneResult & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Analysis failed');
 
-      // 3) Get public URL
-      const { data: publicUrlData } = supabase.storage.from("profiles").getPublicUrl(selfiePath);
-      const publicUrl = publicUrlData.publicUrl;
+      const { error: upErr } = await supabase.from('profiles').upsert(
+        {
+          id: user.id,
+          skin_tone: data.skinTone,
+          undertone: data.undertone,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      );
+      if (upErr) throw upErr;
 
-      // 4) Detect skin tone using Claude API
-      const detectResponse = await fetch("/api/profile/detect-skin-tone", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64,
-          mediaType: file.type || "image/jpeg",
-        }),
-      });
-      const detectData = (await detectResponse.json()) as {
-        skinTone?: string;
-        error?: string;
-        details?: string;
-      };
-      if (!detectResponse.ok) {
-        if (detectData.error) {
-          setSelfieError(detectData.error);
-        } else if (detectData.details) {
-          setSelfieError(detectData.details);
-        } else {
-          setSelfieError("Could not detect skin tone.");
-        }
-        setLoadingSelfie(false);
-        return;
-      }
-
-      let detectedSkinTone = "";
-      if (detectData.skinTone) {
-        detectedSkinTone = detectData.skinTone;
-      } else {
-        detectedSkinTone = "Warm Medium";
-      }
-
-      // 5) Save to profiles
-      const { error: upsertError } = await supabase
-        .from("profiles")
-        .upsert(
-          {
-            id: user.id,
-            selfie_url: publicUrl,
-            skin_tone: detectedSkinTone,
-          },
-          { onConflict: "id" }
-        );
-
-      if (upsertError) {
-        setSelfieError(upsertError.message);
-        setLoadingSelfie(false);
-        return;
-      }
-
-      // 7) Show detected tone
-      setSkinTone(detectedSkinTone);
-      // 8) Saved message
-      setSelfieSavedMessage("Saved! ✅");
+      setSkinTone(data.skinTone);
+      setUndertone(data.undertone);
+      setBestColors(Array.isArray(data.bestColors) ? data.bestColors : []);
+      setSuccess('Skin tone saved to your profile.');
+      if (fileRef.current) fileRef.current.value = '';
     } catch (e) {
-      setSelfieError(e instanceof Error ? e.message : "Selfie upload failed.");
+      setError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
-      setLoadingSelfie(false);
-    }
-  };
-
-  const handleFullBodyUpload = async (file: File) => {
-    setLoadingFullBody(true);
-    setFullBodyError("");
-    setFullBodySavedMessage("");
-
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setFullBodyError("Please log in again.");
-        setLoadingFullBody(false);
-        return;
-      }
-
-      // 4) Show preview
-      const preview = URL.createObjectURL(file);
-      setFullBodyPreview(preview);
-
-      // 1) Upload to storage at fixed path
-      const fullBodyPath = `fullbody/${user.id}/body.jpg`;
-      const { error: uploadError } = await supabase.storage.from("profiles").upload(fullBodyPath, file, {
-        upsert: true,
-        contentType: file.type || "image/jpeg",
-      });
-      if (uploadError) {
-        setFullBodyError(uploadError.message);
-        setLoadingFullBody(false);
-        return;
-      }
-
-      // 2) Get public URL
-      const { data: publicUrlData } = supabase.storage.from("profiles").getPublicUrl(fullBodyPath);
-      const publicUrl = publicUrlData.publicUrl;
-
-      // 3) Save to profiles
-      const { error: upsertError } = await supabase
-        .from("profiles")
-        .upsert(
-          {
-            id: user.id,
-            full_body_url: publicUrl,
-          },
-          { onConflict: "id" }
-        );
-
-      if (upsertError) {
-        setFullBodyError(upsertError.message);
-        setLoadingFullBody(false);
-        return;
-      }
-
-      // 5) Saved message
-      setFullBodySavedMessage("Saved! ✅");
-    } catch (e) {
-      setFullBodyError(e instanceof Error ? e.message : "Full body upload failed.");
-    } finally {
-      setLoadingFullBody(false);
-    }
-  };
-
-  const handleSaveProfileDetails = async () => {
-    setSavingDetails(true);
-    setSelfieError("");
-    setMessage("");
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setSelfieError("Please log in again.");
-        setSavingDetails(false);
-        return;
-      }
-
-      const { error } = await supabase
-        .from("profiles")
-        .upsert(
-          {
-            id: user.id,
-            age_group: ageGroup || null,
-            gender: gender || null,
-            style_personality: stylePersonality || null,
-            body_type: bodyType || null,
-            skin_tone: skinTone || null,
-            selfie_url: selfiePreview || null,
-            full_body_url: fullBodyPreview || null,
-          },
-          { onConflict: "id" }
-        );
-
-      if (error) {
-        setSelfieError(error.message);
-        setMessage("");
-      } else {
-        setSelfieError("");
-        setMessage("Profile saved! ✅");
-      }
-    } finally {
-      setSavingDetails(false);
+      setAnalyzeLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-black px-4 py-10 sm:px-6">
-      <div className="mx-auto max-w-6xl">
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md sm:p-8">
-          <h1 className="text-3xl font-bold text-white">📸 Upload Your Photos</h1>
-          <p className="mt-2 text-white/60">
-            Upload these first so CocoStyle can personalize everything for you.
-          </p>
+    <div className="min-h-screen bg-[#07070c] pb-20 text-zinc-100">
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/40">CocoStyle</p>
+        <h1 className="mt-2 bg-gradient-to-r from-[#e8a598] via-[#c084fc] to-[#8b5cf6] bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
+          Profile
+        </h1>
+        <p className="mt-3 text-sm text-white/50">
+          Your account, coloring, and best shades for outfits across CocoStyle.
+        </p>
 
-          {loadingProfile && (
-            <p className="mt-4 text-sm text-white/60">Loading your existing profile...</p>
-          )}
+        {noConfig ? (
+          <p className="mt-6 text-sm text-amber-200/90">Supabase is not configured.</p>
+        ) : null}
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => selfieInputRef.current?.click()}
-              className="rounded-2xl border border-dashed border-white/25 bg-white/5 p-6 text-left transition hover:bg-white/10"
-            >
-              <p className="text-2xl">🤳</p>
-              <h2 className="mt-2 text-xl font-semibold text-white">Upload Selfie</h2>
-              <p className="mt-1 text-sm text-white/60">Front face photo for skin tone detection</p>
-              {selfiePreview && (
-                <img src={selfiePreview} alt="Selfie preview" className="mt-4 h-56 w-full rounded-xl object-cover" />
-              )}
-              {loadingSelfie && <p className="mt-3 text-sm text-white/70">Uploading & detecting skin tone...</p>}
-              {selfieError && (
-                <p className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                  {selfieError}
-                </p>
-              )}
-              {selfieSavedMessage && (
-                <p className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
-                  {selfieSavedMessage}
-                </p>
-              )}
-            </button>
+        {loading ? (
+          <p className="mt-8 text-sm text-white/40">Loading…</p>
+        ) : !user ? (
+          <p className="mt-8 text-sm text-white/45">Sign in to manage your profile.</p>
+        ) : (
+          <div className="mt-10 space-y-8">
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+              <h2 className="text-sm font-semibold text-white/90">Account</h2>
+              <dl className="mt-4 space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-white/35">Name</dt>
+                  <dd className="mt-1 text-white">{displayName}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-white/35">Email</dt>
+                  <dd className="mt-1 text-white/85">{user.email ?? '—'}</dd>
+                </div>
+              </dl>
+            </section>
 
-            <button
-              type="button"
-              onClick={() => fullBodyInputRef.current?.click()}
-              className="rounded-2xl border border-dashed border-white/25 bg-white/5 p-6 text-left transition hover:bg-white/10"
-            >
-              <p className="text-2xl">🧍</p>
-              <h2 className="mt-2 text-xl font-semibold text-white">Upload Full Body Photo</h2>
-              <p className="mt-1 text-sm text-white/60">A full-length photo for fit and body context</p>
-              {fullBodyPreview && (
-                <img
-                  src={fullBodyPreview}
-                  alt="Full body preview"
-                  className="mt-4 h-56 w-full rounded-xl object-cover"
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+              <h2 className="text-sm font-semibold text-white/90">Selfie · skin tone</h2>
+              <p className="mt-2 text-sm text-white/45">
+                Upload a clear face/neck photo. We analyze it and save skin tone + undertone to
+                your profile for better outfit picks.
+              </p>
+              <label className="mt-4 block text-xs text-white/45">
+                Photo
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  disabled={analyzeLoading}
+                  onChange={(ev) => {
+                    const f = ev.target.files?.[0];
+                    if (f) void handleSelfie(f);
+                  }}
+                  className="mt-1 w-full text-sm text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-white"
                 />
-              )}
-              {loadingFullBody && <p className="mt-3 text-sm text-white/70">Uploading full body photo...</p>}
-              {fullBodyError && (
-                <p className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                  {fullBodyError}
+              </label>
+              {analyzeLoading ? (
+                <p className="mt-3 text-sm text-white/50">Analyzing…</p>
+              ) : null}
+              {error ? (
+                <p className="mt-3 text-sm text-rose-300" role="alert">
+                  {error}
                 </p>
+              ) : null}
+              {success ? <p className="mt-3 text-sm text-emerald-300/90">{success}</p> : null}
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+              <h2 className="text-sm font-semibold text-white/90">Detected coloring</h2>
+              {!skinTone && !undertone ? (
+                <p className="mt-3 text-sm text-white/40">Upload a selfie to detect your tones.</p>
+              ) : (
+                <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div
+                    className="h-24 w-24 shrink-0 rounded-2xl ring-2 ring-white/20 shadow-lg"
+                    style={{ background: undertoneSwatchStyle(undertone) }}
+                    title="Undertone-inspired swatch"
+                  />
+                  <div>
+                    <p className="text-lg font-medium text-white">{skinTone ?? '—'}</p>
+                    {undertone ? (
+                      <p className="mt-1 text-sm text-[#c084fc]">
+                        Undertone: <span className="capitalize">{undertone}</span>
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-xs text-white/40">
+                      CocoStyle palette: <span className="text-white/60">{paletteKey}</span>
+                    </p>
+                  </div>
+                </div>
               )}
-              {fullBodySavedMessage && (
-                <p className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
-                  {fullBodySavedMessage}
-                </p>
-              )}
-            </button>
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+              <h2 className="text-sm font-semibold text-white/90">Best colors for you</h2>
+              <p className="mt-2 text-sm text-white/45">
+                From your latest analysis plus CocoStyle&apos;s palette for your undertone.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(bestColors.length ? bestColors : paletteRule.best).map((c) => (
+                  <span
+                    key={c}
+                    className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-white/85"
+                  >
+                    {c}
+                  </span>
+                ))}
+              </div>
+              {paletteRule.avoid.length ? (
+                <div className="mt-6 border-t border-white/[0.06] pt-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-white/35">
+                    Often less flattering
+                  </p>
+                  <p className="mt-2 text-sm text-white/50">{paletteRule.avoid.join(' · ')}</p>
+                </div>
+              ) : null}
+            </section>
           </div>
-
-          <input
-            ref={selfieInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleSelfieUpload(file);
-            }}
-          />
-          <input
-            ref={fullBodyInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleFullBodyUpload(file);
-            }}
-          />
-
-          {skinTone && (
-            <p className="mt-6 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-emerald-300">
-              Skin tone detected: {skinTone} ✅
-            </p>
-          )}
-        </section>
-
-        <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-          <h3 className="text-xl font-semibold text-white">Profile details</h3>
-          <p className="mt-2 text-sm text-white/60">Personalize your style profile for better AI suggestions.</p>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm text-white/70">Age group</label>
-              <select
-                value={ageGroup}
-                onChange={(e) => setAgeGroup(e.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white focus:outline-none"
-              >
-                <option value="" className="bg-black">Select age group</option>
-                <option value="Teen (13-17)" className="bg-black">🧒 Teen (13-17)</option>
-                <option value="Young Adult (18-25)" className="bg-black">🧑 Young Adult (18-25)</option>
-                <option value="Adult (26-35)" className="bg-black">👨 Adult (26-35)</option>
-                <option value="Mid Adult (36-45)" className="bg-black">👨‍💼 Mid Adult (36-45)</option>
-                <option value="Senior (46+)" className="bg-black">👴 Senior (46+)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-white/70">Gender</label>
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white focus:outline-none"
-              >
-                <option value="" className="bg-black">Select gender</option>
-                <option value="Male" className="bg-black">👨 Male</option>
-                <option value="Female" className="bg-black">👩 Female</option>
-                <option value="Non-binary" className="bg-black">🧑 Non-binary</option>
-                <option value="Prefer not to say" className="bg-black">🤐 Prefer not to say</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-white/70">Style personality</label>
-              <select
-                value={stylePersonality}
-                onChange={(e) => setStylePersonality(e.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white focus:outline-none"
-              >
-                <option value="" className="bg-black">Select style personality</option>
-                <option value="Casual" className="bg-black">🕶️ Casual</option>
-                <option value="Professional" className="bg-black">💼 Professional</option>
-                <option value="Creative" className="bg-black">🎨 Creative</option>
-                <option value="Minimal" className="bg-black">🌿 Minimal</option>
-                <option value="Bold" className="bg-black">🔥 Bold</option>
-                <option value="Elegant" className="bg-black">👑 Elegant</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-white/70">Body type (optional)</label>
-              <select
-                value={bodyType}
-                onChange={(e) => setBodyType(e.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white focus:outline-none"
-              >
-                <option value="" className="bg-black">Select body type</option>
-                <option value="Rectangle" className="bg-black">Rectangle</option>
-                <option value="Hourglass" className="bg-black">Hourglass</option>
-                <option value="Pear" className="bg-black">Pear</option>
-                <option value="Apple" className="bg-black">Apple</option>
-                <option value="Inverted Triangle" className="bg-black">Inverted Triangle</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            onClick={() => void handleSaveProfileDetails()}
-            disabled={savingDetails}
-            className="mt-6 rounded-xl bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] px-5 py-3 font-semibold text-white transition hover:scale-[1.02] disabled:opacity-60"
-          >
-            {savingDetails ? "Saving..." : "Save Profile"}
-          </button>
-        </section>
+        )}
       </div>
-    </main>
+    </div>
   );
 }

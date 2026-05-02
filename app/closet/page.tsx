@@ -1,153 +1,165 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import type { WardrobeItemRow } from '@/lib/wardrobe-types';
 
-type ClosetItem = {
-  id: string;
-  category: "Uppers" | "Lowers" | "Shoes" | "Jackets";
-  image_url: string;
-  name: string;
-  color: string;
-  style: string;
-  occasion?: string;
-  tip?: string;
-};
+const FILTERS = ['All', 'Uppers', 'Lowers', 'Shoes', 'Jackets'] as const;
+type FilterKey = (typeof FILTERS)[number];
 
-const categoryOrder: Array<{ key: ClosetItem["category"]; emoji: string }> = [
-  { key: "Uppers", emoji: "👕" },
-  { key: "Lowers", emoji: "👖" },
-  { key: "Shoes", emoji: "👟" },
-  { key: "Jackets", emoji: "🧥" },
-];
-
-const normalizeCategory = (value: string): ClosetItem["category"] => {
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "uppers") return "Uppers";
-  if (normalized === "lowers") return "Lowers";
-  if (normalized === "shoes") return "Shoes";
-  return "Jackets";
-};
+function categoryBadgeClass(cat: string | null | undefined) {
+  const c = (cat ?? '').toLowerCase();
+  if (c === 'uppers') return 'bg-rose-500/20 text-rose-200 ring-rose-500/30';
+  if (c === 'lowers') return 'bg-sky-500/20 text-sky-200 ring-sky-500/30';
+  if (c === 'shoes') return 'bg-amber-500/20 text-amber-100 ring-amber-500/30';
+  if (c === 'jackets') return 'bg-violet-500/20 text-violet-200 ring-violet-500/30';
+  return 'bg-white/10 text-white/70 ring-white/15';
+}
 
 export default function ClosetPage() {
-  const [items, setItems] = useState<ClosetItem[]>([]);
+  const [items, setItems] = useState<WardrobeItemRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [noConfig, setNoConfig] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKey>('All');
 
-  useEffect(() => {
-    const loadItems = async () => {
-      setLoading(true);
-      setError("");
-
-      const { data, error: fetchError } = await supabase
-        .from("wardrobe")
-        .select("id, user_id, category, name, color, style, occasion, tip, image_url, created_at")
-        .order("created_at", { ascending: false });
-
-      if (fetchError) {
-        setError(fetchError.message);
-        setLoading(false);
-        return;
-      }
-
-      const normalizedItems: ClosetItem[] = (data ?? []).map((item) => ({
-        id: item.id,
-        category: normalizeCategory(item.category),
-        image_url: item.image_url,
-        name: item.name,
-        color: item.color,
-        style: item.style,
-        occasion: item.occasion,
-        tip: item.tip,
-      }));
-
-      setItems(normalizedItems);
+  const load = useCallback(async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setNoConfig(true);
       setLoading(false);
-    };
-
-    void loadItems();
+      setItems([]);
+      return;
+    }
+    setNoConfig(false);
+    setLoading(true);
+    setError(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData.session?.user.id ?? null;
+    setUserId(uid);
+    if (!uid) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    const { data, error: qErr } = await supabase
+      .from('wardrobe_items')
+      .select('*')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false });
+    if (qErr) {
+      setError(qErr.message);
+      setItems([]);
+    } else {
+      setItems((data ?? []) as WardrobeItemRow[]);
+    }
+    setLoading(false);
   }, []);
 
-  const grouped = useMemo(() => {
-    return categoryOrder.map((cat) => ({
-      ...cat,
-      items: items.filter((item) => item.category === cat.key),
-    }));
-  }, [items]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filtered = useMemo(() => {
+    if (filter === 'All') return items;
+    const f = filter.toLowerCase();
+    return items.filter((i) => (i.category ?? '').toLowerCase() === f);
+  }, [items, filter]);
 
   return (
-    <main className="min-h-screen bg-black px-4 py-10 sm:px-6">
-      <div className="mx-auto max-w-6xl">
-        <h1 className="text-3xl font-bold text-white">My Closet</h1>
-        <p className="mt-2 text-white/60">All your uploaded clothes, grouped by category.</p>
+    <div className="min-h-screen bg-[#07070c] pb-20 text-zinc-100">
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/40">CocoStyle</p>
+        <h1 className="mt-2 bg-gradient-to-r from-[#e8a598] via-[#c084fc] to-[#8b5cf6] bg-clip-text text-3xl font-semibold tracking-tight text-transparent md:text-4xl">
+          Your closet
+        </h1>
+        <p className="mt-3 max-w-xl text-sm text-white/50">
+          Everything in your wardrobe, in one place. Filter by category to focus on one area.
+        </p>
 
-        {loading && <p className="mt-8 text-white/60">Loading your closet...</p>}
+        {noConfig ? (
+          <p className="mt-6 text-sm text-amber-200/90">
+            Add <code className="text-white/80">NEXT_PUBLIC_SUPABASE_URL</code> and{' '}
+            <code className="text-white/80">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
+          </p>
+        ) : null}
+        {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
 
-        {error && (
-          <div className="mt-6 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            Could not load closet: {error}
-          </div>
-        )}
+        {!userId && !loading ? (
+          <p className="mt-8 text-sm text-white/45">Sign in to see your closet.</p>
+        ) : null}
 
-        {!loading && !error && (
-          <div className="mt-8 space-y-10">
-            {grouped.map((group) => (
-              <section key={group.key}>
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-2xl font-semibold text-white">
-                    {group.emoji} {group.key}
-                  </h2>
-                  <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/70">
-                    {group.items.length} items
-                  </span>
-                </div>
+        {userId ? (
+          <>
+            <div className="mt-8 flex flex-wrap items-center gap-2">
+              {FILTERS.map((f) => {
+                const on = filter === f;
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFilter(f)}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                      on
+                        ? 'bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] text-[#07070c]'
+                        : 'border border-white/15 bg-white/[0.04] text-white/75 hover:border-white/25'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                );
+              })}
+              <span className="ml-auto text-sm text-white/40">
+                {filtered.length} piece{filtered.length === 1 ? '' : 's'}
+              </span>
+            </div>
 
-                {group.items.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-white/50">
-                    No items yet in {group.key}.
-                  </div>
-                ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {group.items.map((item) => (
-                      <article
-                        key={item.id}
-                        className="overflow-hidden rounded-2xl border border-white/10 bg-white/5"
-                      >
+            {loading ? (
+              <p className="mt-10 text-sm text-white/40">Loading…</p>
+            ) : filtered.length === 0 ? (
+              <p className="mt-10 text-sm text-white/40">
+                No items match this filter. Try another or add pieces in{' '}
+                <a href="/wardrobe" className="text-[#c084fc] hover:underline">
+                  Wardrobe
+                </a>
+                .
+              </p>
+            ) : (
+              <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {filtered.map((row) => (
+                  <li
+                    key={row.id}
+                    className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+                  >
+                    <div className="aspect-square w-full bg-[#12121a]">
+                      {row.image_url ? (
                         <img
-                          src={item.image_url}
-                          alt={item.name}
-                          className="h-52 w-full object-cover"
+                          src={row.image_url}
+                          alt=""
+                          className="h-full w-full object-cover"
                         />
-                        <div className="p-4">
-                          <h3 className="text-lg font-semibold text-white">{item.name}</h3>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/80">
-                              {item.color}
-                            </span>
-                            <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/80">
-                              {item.style}
-                            </span>
-                            {item.occasion && (
-                              <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/80">
-                                {item.occasion}
-                              </span>
-                            )}
-                          </div>
-                          {item.tip && (
-                            <p className="mt-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/75">
-                              Tip: {item.tip}
-                            </p>
-                          )}
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-white/25">
+                          No image
                         </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </section>
-            ))}
-          </div>
-        )}
+                      )}
+                    </div>
+                    <div className="space-y-2 p-3">
+                      <p className="truncate text-sm font-semibold text-white">{row.name}</p>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${categoryBadgeClass(row.category)}`}
+                      >
+                        {row.category ?? 'Piece'}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : null}
       </div>
-    </main>
+    </div>
   );
 }

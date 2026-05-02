@@ -1397,118 +1397,7 @@ export default function Home() {
 
   return (
     <div className={`${inter.className} min-h-screen bg-[#0a0a0a] text-white`}>
-      <style jsx global>{`
-        html {
-          scroll-behavior: smooth;
-        }
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(40px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .reveal {
-          opacity: 0;
-        }
-        .reveal.visible {
-          animation: fadeInUp 0.7s ease forwards;
-        }
-        @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-8px);
-          }
-        }
-        @keyframes marquee {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-        .marquee-track {
-          animation: marquee 18s linear infinite;
-        }
-        @keyframes blink {
-          0%,
-          49% {
-            opacity: 1;
-          }
-          50%,
-          100% {
-            opacity: 0;
-          }
-        }
-        .typing-cursor {
-          animation: blink 1s infinite;
-        }
-        @keyframes shimmer {
-          0% {
-            background-position: 0% center;
-          }
-          100% {
-            background-position: 200% center;
-          }
-        }
-        .logo-shimmer {
-          background: linear-gradient(90deg, #e8a598, #8b5cf6, #e8a598);
-          background-size: 200% auto;
-          animation: shimmer 3s linear infinite;
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-        }
-        @keyframes toastIn {
-          from {
-            opacity: 0;
-            transform: translateX(-24px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        @keyframes confettiFall {
-          0% {
-            transform: translateY(-20px) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(100vh) rotate(720deg);
-            opacity: 0;
-          }
-        }
-        .demo-scrollbar::-webkit-scrollbar {
-          width: 8px;
-        }
-        .demo-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.08);
-          border-radius: 9999px;
-        }
-        .demo-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(232, 165, 152, 0.6);
-          border-radius: 9999px;
-        }
-        @keyframes dnaTicker {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-        .dna-ticker-track {
-          animation: dnaTicker 30s linear infinite;
-        }
-      `}</style>
+      
 
       <div
         className="fixed left-0 top-0 z-[200] h-[3px] bg-gradient-to-r from-[#e8a598] to-[#8b5cf6] transition-[width] duration-150"
@@ -3918,3 +3807,4 @@ Examples:
     </div>
   );
 }
+

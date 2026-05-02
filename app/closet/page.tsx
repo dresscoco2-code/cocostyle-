@@ -23,6 +23,7 @@ export default function ClosetPage() {
   const [noConfig, setNoConfig] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>('All');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
@@ -66,6 +67,27 @@ export default function ClosetPage() {
     const f = filter.toLowerCase();
     return items.filter((i) => (i.category ?? '').toLowerCase() === f);
   }, [items, filter]);
+
+  const deleteItem = async (row: WardrobeItemRow) => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !userId) return;
+    if (!window.confirm(`Remove "${row.name}" from your closet?`)) return;
+    setDeletingId(row.id);
+    setError(null);
+    try {
+      const { error: delErr } = await supabase
+        .from('wardrobe_items')
+        .delete()
+        .eq('id', row.id)
+        .eq('user_id', userId);
+      if (delErr) throw delErr;
+      setItems((prev) => prev.filter((i) => i.id !== row.id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete item');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#07070c] pb-20 text-zinc-100">
@@ -146,7 +168,18 @@ export default function ClosetPage() {
                       )}
                     </div>
                     <div className="space-y-2 p-3">
-                      <p className="truncate text-sm font-semibold text-white">{row.name}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="truncate text-sm font-semibold text-white">{row.name}</p>
+                        <button
+                          type="button"
+                          disabled={deletingId === row.id}
+                          onClick={() => void deleteItem(row)}
+                          className="shrink-0 rounded-lg border border-rose-500/35 bg-rose-950/40 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-rose-100 hover:bg-rose-900/50 disabled:opacity-40"
+                          title="Remove from closet"
+                        >
+                          {deletingId === row.id ? '…' : 'Delete'}
+                        </button>
+                      </div>
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${categoryBadgeClass(row.category)}`}
                       >

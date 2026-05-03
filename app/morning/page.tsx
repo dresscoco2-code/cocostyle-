@@ -21,7 +21,7 @@ return(<div style={{minHeight:"100vh",background:"#07070c",color:"white",fontFam
 <div style={{maxWidth:"760px",margin:"0 auto",padding:"0 20px"}}>
 <div style={{margin:"28px 0",padding:"24px 28px",background:"linear-gradient(135deg,rgba(232,165,152,0.08),rgba(139,92,246,0.08))",borderRadius:"20px",border:"1px solid rgba(232,165,152,0.2)",textAlign:"center",opacity:affirmationVisible?1:0,transform:affirmationVisible?"translateY(0)":"translateY(16px)",transition:"all 0.7s ease"}}>
 <div style={{fontSize:"1.5rem",marginBottom:"10px"}}>✨</div>
-<p style={{fontSize:"clamp(0.95rem,2.5vw,1.15rem)",fontStyle:"italic",color:"rgba(255,255,255,0.85)",lineHeight:1.6,margin:0}}>"{affirmation}"</p>
+<p style={{fontSize:"clamp(0.95rem,2.5vw,1.15rem)",fontStyle:"italic",color:"rgba(255,255,255,0.85)",lineHeight:1.6,margin:0}}>&quot;{affirmation}&quot;</p>
 <div style={{marginTop:"10px",fontSize:"0.7rem",color:"rgba(232,165,152,0.6)",textTransform:"uppercase",letterSpacing:"0.12em"}}>Daily Affirmation</div>
 </div>
 <Section title="🌤️ Today Weather" subtitle="What is it like outside?">
